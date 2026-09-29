@@ -162,7 +162,12 @@ check('样式：隐藏自带状态行、按 composer 宽度对齐、黄点规则
   assert.match(css, /--dsh-composer-card-max-width/)
   assert.match(css, /padding:0 2px 12px 2px/)
   assert.match(css, /\.dtm-dot\{flex:none;width:16px;height:16px;margin-right:6px;/)
-  assert.match(css, /\.dtm-dot\[data-running="true"\]\{background:radial-gradient\(circle at center,var\(--dsw-alias-state-warn-primary/)
+  assert.match(css, /\.dtm-dot\[data-running="true"\]::before\{background:var\(--dsw-alias-state-warn-primary/)
+  // 盒子必须永不变换：动效挂在内部的 ::before 上，16×16 只是定位容器
+  assert.match(css, /\.dtm-dot\{[^}]*display:inline-flex;align-items:center;justify-content:center\}/)
+  assert.doesNotMatch(css, /\.dtm-dot\{[^}]*animation:/)
+  assert.doesNotMatch(css, /\.dtm-dot\{[^}]*background:/)
+  assert.match(css, /\.dtm-dot::before\{[^}]*animation:dtm-breathe/)
 })
 
 check('formatDuration', () => {

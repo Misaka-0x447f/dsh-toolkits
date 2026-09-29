@@ -43,14 +43,18 @@ window.__ModuleLoader__.load({
 			"color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;",
 			"white-space:nowrap;overflow:hidden;",
 			"user-select:none;-webkit-user-select:none;pointer-events:none}",
-			// 活着信号：呼吸点。盒子占满官方图标的 16×16（可视圆点仍约 6px，由背景圆画在盒子中心），
-			// 右侧固定 6px 间距；有工具在执行时由蓝转黄
+			// 活着信号：呼吸点。
+			// 盒子固定 16×16（对齐官方图标尺寸）且**永不变换**——动效只加在内部的 6px 圆上，
+			// 用 flex 居中，所以盒子体积是绝对不变量，不会每帧重栅格化导致漂移。
+			// 有工具在执行时由蓝转黄。
 			".dtm-dot{flex:none;width:16px;height:16px;margin-right:6px;",
-			"background:radial-gradient(circle at center,var(--dsw-static-deepseek-500,#4d6bfe) 0 3px,transparent 3px);",
+			"display:inline-flex;align-items:center;justify-content:center}",
+			".dtm-dot::before{content:\"\";width:6px;height:6px;border-radius:50%;",
+			"background:var(--dsw-static-deepseek-500,#4d6bfe);",
 			"animation:dtm-breathe 1.6s ease-in-out infinite}",
-			'.dtm-dot[data-running="true"]{background:radial-gradient(circle at center,var(--dsw-alias-state-warn-primary,#f59e0b) 0 3px,transparent 3px)}',
+			'.dtm-dot[data-running="true"]::before{background:var(--dsw-alias-state-warn-primary,#f59e0b)}',
 			"@keyframes dtm-breathe{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}",
-			"@media (prefers-reduced-motion:reduce){.dtm-dot{animation:none;opacity:.75}}",
+			"@media (prefers-reduced-motion:reduce){.dtm-dot::before{animation:none;opacity:.75}}",
 			// 视觉隐藏的静态标签：读屏器播报一次「本轮运行中」，而每秒 tick 的计时被 aria-hidden 排除
 			".dtm-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;",
 			"clip:rect(0 0 0 0);white-space:nowrap;border:0}",
