@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 
 // ============================================================================
-// dsh-better-manual-router —— OpenRouter 实时方案驱动的小字块
+// dsh-peak-timer —— OpenRouter 实时方案驱动的小字块
 // （v0.2.0 起只跟踪 deepseek/deepseek-v4.1-flash 单模型）
 //
 // 每 5 分钟抓一次 OpenRouter（host 缓存节流），单行，锚定在侧边栏“设置”按钮
@@ -47,12 +47,12 @@ const POLL_MS = 5 * 60 * 1000
 
 // —— 浏览器侧 widget 源码（host 端作为 JS 内容服务并注入页面）——
 const WIDGET_JS = `(function () {
-  if (window.__dshBetterManualRouter) return
-  window.__dshBetterManualRouter = true
+  if (window.__dshPeakTimer) return
+  window.__dshPeakTimer = true
 
   var ICONS = {
-    whale: '<img src="/dsh-better-manual-router/deepseek.png" width="16" height="16" alt="" style="display:block;width:16px;height:16px">',
-    router: '<img src="/dsh-better-manual-router/openrouter.png" width="16" height="16" alt="" style="display:block;width:16px;height:16px">'
+    whale: '<img src="/dsh-peak-timer/deepseek.png" width="16" height="16" alt="" style="display:block;width:16px;height:16px">',
+    router: '<img src="/dsh-peak-timer/openrouter.png" width="16" height="16" alt="" style="display:block;width:16px;height:16px">'
   }
 
   var css = [
@@ -129,7 +129,7 @@ const WIDGET_JS = `(function () {
   }
 
   function poll() {
-    fetch('/dsh-better-manual-router/prices')
+    fetch('/dsh-peak-timer/prices')
       .then(function (r) { return r.json() })
       .then(function (j) {
         if (j && j.ok && Array.isArray(j.rows) && j.rows.length) {
@@ -302,7 +302,7 @@ function computeState(json, nowMs) {
 async function fetchOpenRouter() {
   const now = Date.now()
   const results = await Promise.all(MODELS.map(async (m) => {
-    const res = await fetch(listedUrl(m.permaslug), { headers: { 'User-Agent': 'dsh-better-manual-router' } })
+    const res = await fetch(listedUrl(m.permaslug), { headers: { 'User-Agent': 'dsh-peak-timer' } })
     if (!res.ok) throw new Error('openrouter ' + res.status)
     const json = await res.json()
     const st = computeState(json, now)
@@ -319,7 +319,7 @@ try {
   ASSETS.openrouter = fs.readFileSync(path.join(__dirname, 'openrouter.png'))
 } catch (err) {}
 
-const name = 'dsh-better-manual-router'
+const name = 'dsh-peak-timer'
 const inject = ['webServer']
 
 function apply(ctx) {
@@ -327,7 +327,7 @@ function apply(ctx) {
 
   disposers.push(ctx.webServer.register({
     kind: 'exact',
-    path: '/dsh-better-manual-router/widget.js',
+    path: '/dsh-peak-timer/widget.js',
     handler: (req, res) => {
       res.writeHead(200, {
         'Content-Type': 'application/javascript; charset=utf-8',
@@ -337,7 +337,7 @@ function apply(ctx) {
     },
   }))
 
-  for (const [file, route] of [['deepseek', '/dsh-better-manual-router/deepseek.png'], ['openrouter', '/dsh-better-manual-router/openrouter.png']]) {
+  for (const [file, route] of [['deepseek', '/dsh-peak-timer/deepseek.png'], ['openrouter', '/dsh-peak-timer/openrouter.png']]) {
     disposers.push(ctx.webServer.register({
       kind: 'exact',
       path: route,
@@ -351,7 +351,7 @@ function apply(ctx) {
 
   disposers.push(ctx.webServer.register({
     kind: 'exact',
-    path: '/dsh-better-manual-router/prices',
+    path: '/dsh-peak-timer/prices',
     handler: async (req, res) => {
       const now = Date.now()
       if (!cache.data || now - cache.ts >= POLL_MS) {
@@ -372,8 +372,8 @@ function apply(ctx) {
   }))
 
   disposers.push(ctx.webServer.tapIndex((html) => {
-    if (html.indexOf('/dsh-better-manual-router/widget.js') !== -1) return html
-    const tag = '<script defer src="/dsh-better-manual-router/widget.js"></script>'
+    if (html.indexOf('/dsh-peak-timer/widget.js') !== -1) return html
+    const tag = '<script defer src="/dsh-peak-timer/widget.js"></script>'
     if (html.indexOf('</body>') !== -1) return html.replace('</body>', tag + '</body>')
     return html + tag
   }))
