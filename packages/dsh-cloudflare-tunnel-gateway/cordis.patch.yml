@@ -1,0 +1,6 @@
+# Safe to install: configure the row in the Web profile before enabling it.
+- insert:
+    - id: dsh-cloudflare-tunnel-gateway
+      name: dsh-cloudflare-tunnel-gateway
+      config:
+        enabled: false
