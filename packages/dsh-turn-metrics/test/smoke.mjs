@@ -168,6 +168,9 @@ check('样式：隐藏自带状态行、按 composer 宽度对齐、黄点规则
   assert.doesNotMatch(css, /\.dtm-dot\{[^}]*animation:/)
   assert.doesNotMatch(css, /\.dtm-dot\{[^}]*background:/)
   assert.match(css, /\.dtm-dot::before\{[^}]*animation:dtm-breathe/)
+  // 呼吸只改明暗、不改体积：整份样式里不出现任何 transform（缩放会带来大小变化与重栅格化）
+  assert.doesNotMatch(css, /transform:/)
+  assert.match(css, /@keyframes dtm-breathe\{0%,100%\{opacity:[\d.]+\}50%\{opacity:1\}\}/)
 })
 
 check('formatDuration', () => {
