@@ -1,0 +1,8 @@
+# dsh-turn-metrics —— 运行状态行的挂载声明。
+# 客户端插件模式（同 @deepseek-ai/dsh-client-ui-goal）：
+# host 半是空 apply，只为了让包进入装配树；浏览器半由 package.json 的
+# dsh.client 声明发现，并由 dsh-client-modules 以 /plugins/dsh-turn-metrics/client.js 投递。
+
+- insert:
+    - id: dsh-turn-metrics
+      name: dsh-turn-metrics

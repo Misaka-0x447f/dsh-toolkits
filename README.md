@@ -7,6 +7,7 @@ Misaka 的个人 DSH（DeepSeek Harness）插件集合。每个插件是 `packag
 | 包 | 形态 | 说明 |
 | --- | --- | --- |
 | [`dsh-peak-timer`](packages/dsh-peak-timer) | host 注入（注入前端 widget JS） | Web 侧边栏峰谷定价倒计时小字块，跟踪 OpenRouter 实时定价 |
+| [`dsh-turn-metrics`](packages/dsh-turn-metrics) | 客户端插件（占用 `conversation.input.dock`） | composer 上方的运行状态行：本轮工具调用计数 + 本轮已用时，并隐藏自带的「深度求索中…」 |
 
 ## 挂载到 DSH profile
 
