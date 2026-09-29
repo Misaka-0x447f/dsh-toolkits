@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
 			".dtm-root{box-sizing:border-box;display:flex;align-items:center;gap:0;",
 			"width:calc(100% - 2 * var(--dsh-composer-side-clearance, 0px) - 4 * var(--dsh-composer-dock-inset, 0px));",
 			"max-width:calc(var(--dsh-composer-card-max-width, var(--dsh-chat-content-width, 100%)) - 4 * var(--dsh-composer-dock-inset, 0px));",
-			"margin:0 auto;padding:0 2px 12px 2px;",
+			"margin:0 auto;padding:0 0 12px 0;",
 			"font-size:var(--dsh-content-font-size-secondary,13px);",
 			"line-height:calc(18px + var(--dsh-content-font-delta-secondary,0px));",
 			"color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;",
