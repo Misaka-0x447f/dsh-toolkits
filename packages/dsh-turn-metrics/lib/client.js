@@ -32,17 +32,23 @@ window.__ModuleLoader__.load({
 		var BUILTIN_STATUS_SELECTOR = '[class*="_turnStatus"]';
 		var STYLE_TAG_ID = "dsh-turn-metrics";
 		var CSS = [
-			// 整行席位：单行、等宽数字、超长省略
-			".dtm-root{display:flex;align-items:center;gap:6px;width:100%;padding:0 2px 6px;",
+			// 与 composer 卡片同宽：几何照抄同一席位上已验证的 GoalBar dock
+			// （宽 = 面板宽 − 两侧 clearance − 4×dock inset；再按 composer 卡片最大宽收窄并居中）
+			".dtm-root{box-sizing:border-box;display:flex;align-items:center;gap:0;",
+			"width:calc(100% - 2 * var(--dsh-composer-side-clearance, 0px) - 4 * var(--dsh-composer-dock-inset, 0px));",
+			"max-width:calc(var(--dsh-composer-card-max-width, var(--dsh-chat-content-width, 100%)) - 4 * var(--dsh-composer-dock-inset, 0px));",
+			"margin:0 auto;padding:0 2px 12px 2px;",
 			"font-size:var(--dsh-content-font-size-secondary,13px);",
 			"line-height:calc(18px + var(--dsh-content-font-delta-secondary,0px));",
 			"color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;",
-			"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
+			"white-space:nowrap;overflow:hidden;",
 			"user-select:none;-webkit-user-select:none;pointer-events:none}",
-			// 活着信号：呼吸点
-			".dtm-dot{flex:none;width:6px;height:6px;border-radius:50%;",
-			"background:var(--dsw-static-deepseek-500,#4d6bfe);",
+			// 活着信号：呼吸点。盒子占满官方图标的 16×16（可视圆点仍约 6px，由背景圆画在盒子中心），
+			// 右侧固定 6px 间距；有工具在执行时由蓝转黄
+			".dtm-dot{flex:none;width:16px;height:16px;margin-right:6px;",
+			"background:radial-gradient(circle at center,var(--dsw-static-deepseek-500,#4d6bfe) 0 3px,transparent 3px);",
 			"animation:dtm-breathe 1.6s ease-in-out infinite}",
+			'.dtm-dot[data-running="true"]{background:radial-gradient(circle at center,var(--dsw-alias-state-warn-primary,#f59e0b) 0 3px,transparent 3px)}',
 			"@keyframes dtm-breathe{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}",
 			"@media (prefers-reduced-motion:reduce){.dtm-dot{animation:none;opacity:.75}}",
 			// 视觉隐藏的静态标签：读屏器播报一次「本轮运行中」，而每秒 tick 的计时被 aria-hidden 排除
@@ -139,19 +145,13 @@ window.__ModuleLoader__.load({
 			return stats;
 		}
 		/**
-		 * 拼「事实」部分（工具计数与子代理），不含计时。
+		 * 拼「事实」部分（工具计数与子代理），不含计时；是否有工具在执行只由点的颜色表达。
 		 * @param stats - `deriveStats` 的结果。
-		 * @returns 形如 `5 次工具调用（1 执行中） · 2 个子代理`；没有事实时为空串。
+		 * @returns 形如 `5 次工具调用 · 2 个子代理`；没有事实时为空串。
 		 */
 		function composeFacts(stats) {
 			var parts = [];
-			if (stats.toolCalls > 0) {
-				var calls = stats.toolCalls + " 次工具调用";
-				if (stats.running > 0) calls += "（" + stats.running + " 执行中）";
-				parts.push(calls);
-			} else if (stats.running > 0) {
-				parts.push(stats.running + " 个工具执行中");
-			}
+			if (stats.toolCalls > 0) parts.push(stats.toolCalls + " 次工具调用");
 			if (stats.subagents > 0) parts.push(stats.subagents + " 个子代理");
 			return parts.join(" · ");
 		}
@@ -209,7 +209,11 @@ window.__ModuleLoader__.load({
 			return react.createElement(
 				"div",
 				{ className: "dtm-root", role: "status", "aria-live": "polite" },
-				react.createElement("span", { className: "dtm-dot", "aria-hidden": true }),
+				react.createElement("span", {
+					className: "dtm-dot",
+					"data-running": stats.running > 0 ? "true" : "false",
+					"aria-hidden": true
+				}),
 				react.createElement("span", { className: "dtm-sr" }, "本轮运行中"),
 				facts === "" ? null : react.createElement("span", { className: "dtm-facts" }, facts),
 				react.createElement("span", { className: "dtm-time", "aria-hidden": true }, facts === "" ? time : " · " + time)
@@ -252,6 +256,8 @@ window.__ModuleLoader__.load({
 			composeLabel: composeLabel,
 			selectKey: selectKey,
 			TurnMetrics: TurnMetrics,
+			css: CSS,
+			builtinStatusSelector: BUILTIN_STATUS_SELECTOR,
 			hideBuiltinStatus: HIDE_BUILTIN_STATUS
 		};
 		exports.TurnMetrics = TurnMetrics;

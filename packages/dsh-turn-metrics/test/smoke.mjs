@@ -142,7 +142,28 @@ check('apply 把组件注册到 conversation.input.dock', () => {
 })
 
 // ── 3. 纯逻辑 ────────────────────────────────────────────────────────────────
-const { formatDuration, openTurn, deriveStats, composeFacts, composeLabel, selectKey, TurnMetrics } = plugin.__internals
+const {
+  formatDuration,
+  openTurn,
+  deriveStats,
+  composeFacts,
+  composeLabel,
+  selectKey,
+  TurnMetrics,
+  css,
+  builtinStatusSelector,
+  hideBuiltinStatus
+} = plugin.__internals
+
+check('样式：隐藏自带状态行、按 composer 宽度对齐、黄点规则都在', () => {
+  assert.equal(hideBuiltinStatus, true)
+  assert.equal(builtinStatusSelector, '[class*="_turnStatus"]')
+  assert.match(css, /--dsh-composer-side-clearance/)
+  assert.match(css, /--dsh-composer-card-max-width/)
+  assert.match(css, /padding:0 2px 12px 2px/)
+  assert.match(css, /\.dtm-dot\{flex:none;width:16px;height:16px;margin-right:6px;/)
+  assert.match(css, /\.dtm-dot\[data-running="true"\]\{background:radial-gradient\(circle at center,var\(--dsw-alias-state-warn-primary/)
+})
 
 check('formatDuration', () => {
   assert.equal(formatDuration(0), '0秒')
@@ -191,14 +212,19 @@ check('selectKey 是原始字符串且随事实变化', () => {
   assert.equal(selectKey(idle), '')
 })
 
-check('composeFacts / composeLabel', () => {
-  assert.equal(composeFacts({ toolCalls: 5, subagents: 2, running: 1 }), '5 次工具调用（1 执行中） · 2 个子代理')
-  assert.equal(composeFacts({ toolCalls: 0, subagents: 0, running: 2 }), '2 个工具执行中')
-  assert.equal(composeFacts({ toolCalls: 0, subagents: 0, running: 0 }), '')
-  assert.equal(composeLabel({ toolCalls: 5, subagents: 2, running: 1 }, 84000), '5 次工具调用（1 执行中） · 2 个子代理 · 1分24秒')
+check('composeFacts / composeLabel：执行中不再出文字，只由点色表达', () => {
+  assert.equal(composeFacts({ toolCalls: 5, subagents: 2, running: 1 }), '5 次工具调用 · 2 个子代理')
+  assert.equal(composeFacts({ toolCalls: 5, subagents: 0, running: 3 }), '5 次工具调用')
+  assert.equal(composeFacts({ toolCalls: 0, subagents: 0, running: 2 }), '')
+  assert.equal(composeLabel({ toolCalls: 5, subagents: 2, running: 1 }, 84000), '5 次工具调用 · 2 个子代理 · 1分24秒')
   assert.equal(composeLabel({ toolCalls: 5, subagents: 0, running: 0 }, 84000), '5 次工具调用 · 1分24秒')
-  assert.equal(composeLabel({ toolCalls: 0, subagents: 0, running: 2 }, 5000), '2 个工具执行中 · 5秒')
+  assert.equal(composeLabel({ toolCalls: 0, subagents: 0, running: 2 }, 5000), '5秒')
   assert.equal(composeLabel({ toolCalls: 0, subagents: 0, running: 0 }, 12000), '12秒')
+})
+
+check('文案里不再出现「执行中」字样', () => {
+  const label = composeLabel({ toolCalls: 5, subagents: 2, running: 1 }, 84000)
+  assert.doesNotMatch(label, /执行中|个工具执行/)
 })
 
 // ── 4. 组件渲染 ──────────────────────────────────────────────────────────────
@@ -209,9 +235,15 @@ check('运行中渲染出工具计数与本轮用时', () => {
   const html = render(openSnapshot)
   assert.match(html, /dtm-root/)
   assert.match(html, /dtm-dot/)
-  assert.match(html, /5 次工具调用（2 执行中）/)
-  assert.match(html, /2 个子代理/)
+  assert.match(html, /5 次工具调用 · 2 个子代理/)
   assert.match(html, /1分2[0-9]秒/)
+  assert.doesNotMatch(html, /执行中/)
+})
+
+check('有工具在执行时点标成黄色，否则保持蓝色', () => {
+  assert.match(render(openSnapshot), /dtm-dot[^>]*data-running="true"/)
+  const idleTools = { ...openSnapshot, legacy: { runningCalls: [{ turn: 6 }] } }
+  assert.match(render(idleTools), /dtm-dot[^>]*data-running="false"/)
 })
 
 check('每秒 tick 的计时对读屏器隐藏，静态标签负责播报', () => {
