@@ -37,3 +37,37 @@ Misaka 的个人 DSH（DeepSeek Harness）插件集合。每个插件是 `packag
   `ln -sfn ~/.dsh/profiles/node_modules packages/<name>/node_modules`。
   因为 `link:` 走 realpath，Node 会把包当成位于 `packages/` 下，不建就 `ERR_MODULE_NOT_FOUND`（当前 `dsh-cloudflare-tunnel-gateway` 需要；只依赖 node 内置模块的包不需要）。软链被 gitignore，重新 clone 后要重建。
 - 目前各包都是纯 JS、无构建步骤。`dsh-turn-metrics` 的 `lib/client.js` 是手写 loader bundle（`window.__ModuleLoader__.load`），改浏览器半不需要重启 host（`dsh-client-hmr` 会推送）；host 半改动才需要重启。
+
+## 用户脚本（Tampermonkey）
+
+不是 DSH 插件，放 `userscripts/`，装到浏览器即可。
+
+| 脚本 | 说明 |
+| --- | --- |
+| [`openrouter-backtest-price.user.js`](userscripts/openrouter-backtest-price.user.js) | OpenRouter 模型页的 Providers 表格：加一列「回测价格」（点表头可排序），并在「Providers」标题旁加一个「TPS > 100」过滤器开关 |
+
+计费口径写在脚本顶部的 `CONFIG` 里，改完保存刷新页面即生效：
+
+```js
+const CONFIG = {
+  inputTokens: 5.8e9,        // 输入总 tokens（OpenRouter 语义下已包含缓存命中部分）
+  outputTokens: [26.5e6, 14.1e6],
+  cacheReadTokens: 5.6e9,    // 其中缓存命中读取的 tokens
+  cacheReadIncludedInInput: true, // 5.6B 是否已含在 5.8B 里（默认 true，避免重复计费）
+  tpsThreshold: 100,          // 「TPS > 100」按钮的阈值
+  useDiscountedPrice: true,   // 折扣行用绿色折后价（false 则用被划掉的原价）
+  cacheReadFallbackToInput: true, // 没给缓存价时按输入价计
+  insertAfterHeader: /cache\s*read/i, // 新列插到哪一列后面
+};
+```
+
+所有价格单位都是 **USD / 每 100 万 tokens**（站点列头 `/M` = per million）。
+
+OpenRouter 的 usage 里 `prompt_tokens` 已经包含 `cached_tokens`，所以默认口径会先把缓存那部分从输入里扣掉，避免同一批 token 既按输入价又按缓存价计一遍：
+
+| 口径 | 算式（乘数 × `$/M` 单价） | DeepSeek（$0.15 / $0.60 / $0.003） |
+| --- | --- | --- |
+| `cacheReadIncludedInInput: true`（默认） | `200 × 输入价 + 40.6 × 输出价 + 5600 × 缓存价` | `$71.16` |
+| `cacheReadIncludedInInput: false` | `5800 × 输入价 + 40.6 × 输出价 + 5600 × 缓存价` | `$911.16` |
+
+鼠标悬停单元格可看到逐项拆分（含「输入 5.8B − 缓存命中 5.6B = 200M」这一步）。
