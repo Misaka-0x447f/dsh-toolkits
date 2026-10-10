@@ -1,0 +1,29 @@
+{
+  "name": "dsh-session-id-copy",
+  "version": "0.1.0",
+  "description": "DSH Web 会话列表的「选项」菜单里追加一项「复制会话 ID」",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "license": "UNLICENSED"
+}

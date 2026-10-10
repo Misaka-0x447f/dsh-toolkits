@@ -8,6 +8,7 @@ Misaka 的个人 DSH（DeepSeek Harness）插件集合。每个插件是 `packag
 | --- | --- | --- |
 | [`dsh-peak-timer`](packages/dsh-peak-timer) | host 注入（注入前端 widget JS） | Web 侧边栏峰谷定价倒计时小字块，跟踪 OpenRouter 实时定价 |
 | [`dsh-turn-metrics`](packages/dsh-turn-metrics) | 客户端插件（占用 `conversation.input.dock`） | composer 上方的运行状态行：本轮工具调用计数 + 本轮已用时，并隐藏自带的「深度求索中…」 |
+| [`dsh-session-id-copy`](packages/dsh-session-id-copy) | 客户端插件（DOM 注入，无 slot 可用） | 会话列表每行的「选项」菜单里追加「复制会话 ID」，点了把该会话的 SessionId 写进剪贴板 |
 | [`dsh-cloudflare-tunnel-gateway`](packages/dsh-cloudflare-tunnel-gateway) | host 插件 | 为 DSH Web 指定固定 launch token，供既有 Cloudflare Tunnel 使用（仅当 webServer 绑定 127.0.0.1 时生效） |
 
 ## 挂载到 DSH profile
