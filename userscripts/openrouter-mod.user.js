@@ -79,7 +79,6 @@
   let filterOn = false;
   let busy = false;       // 正在写 DOM，避免观察者自激
   let throttleTimer = 0;
-  let observerOn = false;      // 全局观察者是否已挂上
 
   /* ============================ 样式 ============================ */
   const CSS = `
@@ -543,9 +542,12 @@
   function renderCredits() {
     if (!creditsInput || !creditsValueEl || !creditsValueEl.isConnected) return;
 
-    const amount = numberFromText(creditsInput.value);
+    // Amount 是 number 输入框，可能是 "1e2" 这类科学计数法，所以用 Number() 整体解析，
+    // 不要用「取字符串里第一个数字段」的 numberFromText（那是给 "$0.83" 这种金额文本用的）。
+    const raw = (creditsInput.value || '').trim();
+    const amount = raw === '' ? NaN : Number(raw);
     const fee = numberFromText(feeTextOf(creditsValueEl));
-    const pct = amount != null && amount > 0 && fee != null ? (fee / amount) * 100 : null;
+    const pct = Number.isFinite(amount) && amount > 0 && fee != null ? (fee / amount) * 100 : null;
     const text = pct != null && isFinite(pct) ? pct.toFixed(2) + '%' : '';
     const el = creditsValueEl.querySelector(':scope > .' + CLS_PCT);
 
@@ -605,19 +607,9 @@
   function run() {
     const table = findProvidersTable();
     const input = findCreditsInput();
-    // 充值页即使弹窗还没打开也要挂着观察者，否则用户点「Add Credits」时我们不会知道
-    const observing = !!table || !!input || CREDITS_PATH.test(location.pathname);
 
-    if (observing) ensureStyle();
-
-    // 观察者先挂上：即使下面的 apply 抛异常，下一次 mutation 还能兜底重试
-    if (observing && !observerOn) {
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      observerOn = true;
-    } else if (!observing && observerOn) {
-      observer.disconnect();
-      observerOn = false;
-    }
+    // 只在真的有活干时才注入样式表；但观察者本身不卸载（见下面 observer 的说明）
+    if (table || input || CREDITS_PATH.test(location.pathname)) ensureStyle();
 
     busy = true;
     try {
@@ -638,7 +630,11 @@
     }, 120);
   }
 
+  // 观察者常驻、不卸载：站点是 SPA（pushState 跳转不触发 popstate），Providers 表格和充值弹窗
+  // 又都是异步渲染的。旧版在「目标还没渲染出来」时就 disconnect，于是 SPA 跳转过去之后再也
+  // 没人把我们叫醒（表格/弹窗都不会被增强）。常驻的代价只是每次 DOM 变化后做一次节流查询。
   const observer = new MutationObserver(() => schedule());
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
   // 用户点了 React 自己的排序表头 → 放弃我们的排序，交给它
   document.addEventListener(
