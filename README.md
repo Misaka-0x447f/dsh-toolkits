@@ -45,7 +45,7 @@ Misaka 的个人 DSH（DeepSeek Harness）插件集合。每个插件是 `packag
 
 | 脚本 | 说明 |
 | --- | --- |
-| [`openrouter-backtest-price.user.js`](userscripts/openrouter-backtest-price.user.js) | OpenRouter 模型页的 Providers 表格：加一列「回测价格」（点表头可排序），并在「Providers」标题旁加一个「TPS > 100」过滤器开关 |
+| [`openrouter-mod.user.js`](userscripts/openrouter-mod.user.js) | OpenRouter 增强：模型页 Providers 表格加一列「回测价格」（点表头可排序），并在「Providers」标题旁加一个「TPS」过滤器开关；充值页的 Purchase Credits 弹窗在服务费金额左边显示它占充值额的百分比 |
 
 计费口径写在脚本顶部的 `CONFIG` 里，改完保存刷新页面即生效：
 
@@ -55,7 +55,7 @@ const CONFIG = {
   outputTokens: [26.5e6, 14.1e6],
   cacheReadTokens: 5.6e9,    // 其中缓存命中读取的 tokens
   cacheReadIncludedInInput: true, // 5.6B 是否已含在 5.8B 里（默认 true，避免重复计费）
-  tpsThreshold: 100,          // 「TPS > 100」按钮的阈值
+  tpsThreshold: 70,           // 「TPS > N」按钮的阈值
   useDiscountedPrice: true,   // 折扣行用绿色折后价（false 则用被划掉的原价）
   cacheReadFallbackToInput: true, // 没给缓存价时按输入价计
   insertAfterHeader: /cache\s*read/i, // 新列插到哪一列后面
@@ -72,3 +72,12 @@ OpenRouter 的 usage 里 `prompt_tokens` 已经包含 `cached_tokens`，所以�
 | `cacheReadIncludedInInput: false` | `5800 × 输入价 + 40.6 × 输出价 + 5600 × 缓存价` | `$911.16` |
 
 鼠标悬停单元格可看到逐项拆分（含「输入 5.8B − 缓存命中 5.6B = 200M」这一步）。
+
+### 充值页：服务费占充值额的百分比
+
+在 `https://openrouter.ai/settings/credits` 点「Add Credits」打开 Purchase Credits 弹窗后，脚本会在「Service fees」那一行的金额**左边**补一个百分比，例如 `5.53% $0.83`：
+
+- **分母是充值额**，即 Amount 里输入的那个数（真正买到的 credits），不是含服务费的 Total due。
+- 站点实测的服务费口径是 `max($0.80, 5.5%)`：$100 以上基本都是 5.5%，而 $5 会被 $0.80 的地板顶到 16%。所以这个百分比不是恒定值，值得看一眼。
+- 百分比随 Amount 实时更新，鼠标悬停能看到算式（服务费 ÷ 充值额）。
+- 显示的服务费本身已经四舍五入到分（$15 的服务费真值 $0.825、页面显示 $0.83），所以 $15 会显示 `5.53%` 而不是 `5.5%`。

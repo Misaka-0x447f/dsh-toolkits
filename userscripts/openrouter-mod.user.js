@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         OpenRouter 回测价格 + TPS 过滤器
+// @name         OpenRouter 回测价格 + 服务费占比
 // @namespace    https://github.com/misaka/dsh-toolkits
-// @version      1.0.0
-// @description  在 OpenRouter 模型页的 Providers 表格里加一列「回测价格」（按固定 token 用量算总价，可点击表头排序），并提供一个「TPS > 100」过滤器按钮。
+// @version      1.1.0
+// @description  模型页：Providers 表格里加一列「回测价格」（按固定 token 用量算总价，可点击表头排序），并提供「TPS」过滤器按钮；充值页：在 Purchase Credits 弹窗的服务费金额左边，显示服务费占本次充值额的百分比。
 // @author       misaka
 // @match        https://openrouter.ai/*
 // @run-at       document-idle
@@ -46,8 +46,8 @@
     //   false = 不含（5.8B 是净输入）→ 5.8B 全额按输入价计
     cacheReadIncludedInInput: true,
 
-    // 「TPS > 100」按钮的阈值
-    tpsThreshold: 100,
+    // 「TPS > 70」按钮的阈值
+    tpsThreshold: 70,
 
     // 是否使用折后价（true）还是被划掉的原价（false）
     useDiscountedPrice: true,
@@ -79,6 +79,7 @@
   let filterOn = false;
   let busy = false;       // 正在写 DOM，避免观察者自激
   let throttleTimer = 0;
+  let observerOn = false;      // 全局观察者是否已挂上
 
   /* ============================ 样式 ============================ */
   const CSS = `
@@ -125,6 +126,13 @@
     .${CLS_BTN}[aria-pressed="true"] .orbp-dot { opacity: 1; }
     .orbp-count { opacity: .7; font-variant-numeric: tabular-nums; }
     .orbp-count:empty { display: none; }
+
+    /* 充值弹窗里「服务费占充值额」的百分比：金额左边的小字 */
+    .orbp-pct {
+      margin-right: 6px; font-weight: 400;
+      color: hsl(var(--muted-foreground, 240 4% 46%));
+      font-variant-numeric: tabular-nums;
+    }
   `;
 
   function ensureStyle() {
@@ -462,6 +470,129 @@
     if (count) count.textContent = filterOn ? String(visible) : '';
   }
 
+  /* ==================== 充值页：服务费占充值额的百分比 ==================== */
+  /*
+   * 在 /settings/credits 的 Purchase Credits 弹窗里，把服务费占本次充值额的百分比
+   * 显示在服务费金额的左边（$0.83 → 5.53% $0.83）。
+   * 分母是 Amount 里那个数（真正买到的 credits），不是含服务费的 Total due。
+   * 站点实测口径是 max($0.80, 5.5%)，小额充值会被 $0.80 顶上去，
+   * 所以这个百分比不是恒定的 5.5%，值得显示。
+   */
+  const CLS_PCT = 'orbp-pct';
+  const SERVICE_FEE_LABEL = /^service\s*fees$/i;
+  const CREDITS_PATH = /^\/settings\/credits\/?$/;
+
+  let creditsInput = null;     // Amount 输入框
+  let creditsValueEl = null;   // 服务费金额元素
+  let creditsObserver = null;  // 只盯这个金额元素：React 改的是文本节点，不是 childList
+  let creditsBusy = false;     // 正在写 DOM，避免被自己的观察者自激
+
+  function numberFromText(text) {
+    const m = String(text == null ? '' : text).replace(/,/g, '').match(/[0-9]+(?:\.[0-9]+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+
+  function fmtMoney(v) {
+    return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Purchase Credits 弹窗里的 Amount 输入框（按弹窗标题定位，避开 Auto Top Up 那个弹窗）
+  function findCreditsInput() {
+    for (const h2 of document.querySelectorAll('h2')) {
+      if ((h2.textContent || '').trim() !== 'Purchase Credits') continue;
+      let node = h2.parentElement;
+      for (let i = 0; node && i < 6; i++, node = node.parentElement) {
+        const input = node.querySelector('input[name="creditAmount"]');
+        if (input) return input;
+      }
+    }
+    return null;
+  }
+
+  // 「Service fees」那一行的金额元素（该行是 label span + 金额 div）
+  function findServiceFeeValue(input) {
+    const root = input.closest('form') || input.closest('fieldset') || document;
+    for (const row of root.querySelectorAll('div')) {
+      const label = row.firstElementChild;
+      if (!label || label.tagName !== 'SPAN' || row.children.length < 2) continue;
+      if (!SERVICE_FEE_LABEL.test((label.textContent || '').replace(/\s+/g, ' ').trim())) continue;
+      return row.lastElementChild;
+    }
+    return null;
+  }
+
+  // 金额元素里除我们注入的百分比以外的文字，避免把自己的输出再读回来
+  function feeTextOf(valueEl) {
+    let text = '';
+    for (const node of valueEl.childNodes) {
+      if (node.nodeType === 1 && node.classList && node.classList.contains(CLS_PCT)) continue;
+      text += node.textContent || '';
+    }
+    return text;
+  }
+
+  function writePct(mutate) {
+    creditsBusy = true;
+    try {
+      mutate();
+    } finally {
+      queueMicrotask(() => { creditsBusy = false; });
+    }
+  }
+
+  function renderCredits() {
+    if (!creditsInput || !creditsValueEl || !creditsValueEl.isConnected) return;
+
+    const amount = numberFromText(creditsInput.value);
+    const fee = numberFromText(feeTextOf(creditsValueEl));
+    const pct = amount != null && amount > 0 && fee != null ? (fee / amount) * 100 : null;
+    const text = pct != null && isFinite(pct) ? pct.toFixed(2) + '%' : '';
+    const el = creditsValueEl.querySelector(':scope > .' + CLS_PCT);
+
+    if (!text) {
+      if (el) writePct(() => el.remove());
+      return;
+    }
+    const title = `服务费 ${fmtMoney(fee)} ÷ 充值额 ${fmtMoney(amount)}`;
+    if (el) {
+      if (el.textContent !== text) writePct(() => { el.textContent = text; });
+      if (el.title !== title) writePct(() => { el.title = title; });
+      return;
+    }
+    const span = document.createElement('span');
+    span.className = CLS_PCT;
+    span.textContent = text;
+    span.title = title;
+    writePct(() => creditsValueEl.insertBefore(span, creditsValueEl.firstChild));
+  }
+
+  function onCreditsInput() { renderCredits(); }
+
+  function teardownCredits() {
+    if (creditsObserver) { creditsObserver.disconnect(); creditsObserver = null; }
+    if (creditsInput) creditsInput.removeEventListener('input', onCreditsInput);
+    creditsInput = null;
+    creditsValueEl = null;
+  }
+
+  function applyCredits(input) {
+    const valueEl = input ? findServiceFeeValue(input) : null;
+    if (!input || !valueEl) { teardownCredits(); return; }
+
+    if (input !== creditsInput) {
+      if (creditsInput) creditsInput.removeEventListener('input', onCreditsInput);
+      creditsInput = input;
+      creditsInput.addEventListener('input', onCreditsInput);
+    }
+    if (valueEl !== creditsValueEl) {
+      creditsValueEl = valueEl;
+      if (creditsObserver) creditsObserver.disconnect();
+      creditsObserver = new MutationObserver(() => { if (!creditsBusy) renderCredits(); });
+      creditsObserver.observe(valueEl, { childList: true, characterData: true, subtree: true });
+    }
+    renderCredits();
+  }
+
   /* ============================ 主流程 ============================ */
   function apply(table) {
     ensureStyle();
@@ -473,22 +604,26 @@
 
   function run() {
     const table = findProvidersTable();
-    if (!table) {
-      if (currentTable) {
-        observer.disconnect();
-        currentTable = null;
-      }
-      return;
-    }
-    ensureStyle();
-    if (table !== currentTable) {
-      observer.disconnect();
-      currentTable = table;
+    const input = findCreditsInput();
+    // 充值页即使弹窗还没打开也要挂着观察者，否则用户点「Add Credits」时我们不会知道
+    const observing = !!table || !!input || CREDITS_PATH.test(location.pathname);
+
+    if (observing) ensureStyle();
+
+    // 观察者先挂上：即使下面的 apply 抛异常，下一次 mutation 还能兜底重试
+    if (observing && !observerOn) {
       observer.observe(document.documentElement, { childList: true, subtree: true });
+      observerOn = true;
+    } else if (!observing && observerOn) {
+      observer.disconnect();
+      observerOn = false;
     }
+
     busy = true;
     try {
-      apply(table);
+      currentTable = table;
+      if (table) apply(table);
+      applyCredits(input);
     } finally {
       // MutationObserver 的回调是微任务，排队在我们这个之后 → 它一定会看到 busy=true
       queueMicrotask(() => { busy = false; });
